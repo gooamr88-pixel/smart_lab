@@ -1,0 +1,2 @@
+This directory holds .glb 3D model files.
+Replace placeholder URLs in lib/services/model_assets.dart with local file paths.
