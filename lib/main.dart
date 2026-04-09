@@ -9,6 +9,7 @@ import 'providers/lab_provider.dart';
 import 'providers/quiz_provider.dart';
 import 'providers/image_gen_provider.dart';
 import 'providers/progress_provider.dart';
+import 'providers/smart_chat_provider.dart';
 
 Future<void> main() async {
   // Ensure Flutter bindings are initialized before async calls
@@ -29,6 +30,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => LabProvider()),
         ChangeNotifierProvider(create: (_) => QuizProvider()),
         ChangeNotifierProvider(create: (_) => ImageGenProvider()),
+        ChangeNotifierProvider(create: (_) => SmartChatProvider()),
         ChangeNotifierProvider.value(value: progressProvider),
       ],
       child: const SmartLabApp(),

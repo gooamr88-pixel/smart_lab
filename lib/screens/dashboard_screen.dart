@@ -6,8 +6,7 @@ import '../providers/locale_provider.dart';
 import '../providers/progress_provider.dart';
 import '../models/skill_area.dart';
 import '../widgets/xp_overlay_manager.dart';
-import 'subjects_screen.dart';
-import 'diagnostic_screen.dart';
+import 'smart_chat_screen.dart';
 import 'settings_screen.dart';
 
 /// Main dashboard showing user stats, XP, streak, skills, and activity.
@@ -295,13 +294,14 @@ class _DashboardScreenState extends State<DashboardScreen>
                         children: [
                           Expanded(
                             child: _QuickAction(
-                              emoji: '📚',
-                              label: isArabic ? 'المواد' : 'Subjects',
-                              gradient: AppGradients.chemistry,
+                              emoji: '🔬',
+                              label: isArabic ? 'المعمل الذكي' : 'Virtual Lab',
+                              gradient: AppGradients.roadmapLab,
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const SubjectsScreen()),
+                                    builder: (_) =>
+                                        const SmartChatScreen(mode: 'lab')),
                               ),
                             ),
                           ),
@@ -309,12 +309,13 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: _QuickAction(
                               emoji: '🧠',
-                              label: isArabic ? 'اختبار تشخيصي' : 'Diagnostic',
-                              gradient: AppGradients.roadmapAi,
+                              label: isArabic ? 'اختبار ذكي' : 'Smart Quiz',
+                              gradient: AppGradients.roadmapQuiz,
                               onTap: () => Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (_) => const DiagnosticScreen()),
+                                    builder: (_) =>
+                                        const SmartChatScreen(mode: 'quiz')),
                               ),
                             ),
                           ),

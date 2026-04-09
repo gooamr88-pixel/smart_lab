@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_progress.dart';
 import '../models/skill_area.dart';
+import '../widgets/xp_overlay.dart';
 
 /// Provider managing user progress, XP, levels, badges, and adaptive learning.
 /// Persists data to SharedPreferences.
@@ -93,6 +94,59 @@ class ProgressProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Award XP with visual overlay feedback.
+  ///
+  /// This is the primary method to call from screens. It:
+  /// 1. Awards the XP via [addXp]
+  /// 2. Shows the floating "+XP" badge overlay
+  /// 3. Shows level-up celebration if triggered
+  /// 4. Shows badge notification if earned
+  void addXpWithOverlay(
+    BuildContext context, {
+    required int amount,
+    String? skill,
+    String? label,
+    String emoji = '⚡',
+  }) {
+    final prevLevel = _progress.level;
+    final prevBadgeCount = _progress.earnedBadges.length;
+
+    addXp(amount, skill: skill);
+
+    // Show XP overlay
+    if (context.mounted) {
+      XpOverlay.show(context, amount: amount, label: label, emoji: emoji);
+    }
+
+    // Show level-up if triggered
+    if (_progress.level > prevLevel && context.mounted) {
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (context.mounted) {
+          XpOverlay.showLevelUp(context, newLevel: _progress.level);
+        }
+      });
+    }
+
+    // Show badge if earned
+    if (_progress.earnedBadges.length > prevBadgeCount && context.mounted) {
+      final newBadgeId = _progress.earnedBadges.last;
+      final badge = Badges.getById(newBadgeId);
+      if (badge != null) {
+        Future.delayed(const Duration(milliseconds: 800), () {
+          if (context.mounted) {
+            XpOverlay.showBadge(
+              context,
+              name: badge.nameEn,
+              emoji: badge.emoji,
+            );
+          }
+        });
+      }
+    }
+
+    clearLevelUp();
+  }
+
   void _recalculateLevel() {
     int accumulated = 0;
     int level = 1;
@@ -133,16 +187,34 @@ class ProgressProvider extends ChangeNotifier {
     }
   }
 
-  /// Record experiment completion
-  void completeExperiment() {
+  /// Record experiment completion with optional overlay
+  void completeExperiment({BuildContext? context}) {
     _progress.experimentsCompleted++;
-    addXp(XpRewards.experimentComplete);
+    if (context != null && context.mounted) {
+      addXpWithOverlay(
+        context,
+        amount: XpRewards.experimentComplete,
+        label: 'Experiment! 🧪',
+        emoji: '🧪',
+      );
+    } else {
+      addXp(XpRewards.experimentComplete);
+    }
   }
 
-  /// Record simulation completion
-  void completeSimulation() {
+  /// Record simulation completion with optional overlay
+  void completeSimulation({BuildContext? context}) {
     _progress.simulationsCompleted++;
-    addXp(XpRewards.simulationComplete);
+    if (context != null && context.mounted) {
+      addXpWithOverlay(
+        context,
+        amount: XpRewards.simulationComplete,
+        label: 'Simulation! 🚀',
+        emoji: '🚀',
+      );
+    } else {
+      addXp(XpRewards.simulationComplete);
+    }
   }
 
   /// Record AI question asked

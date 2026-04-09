@@ -16,7 +16,7 @@ class SmartLabApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Smart Lab - المعمل الذكي',
+      title: 'بساريا',
 
       // Theme
       theme: AppTheme.darkTheme,
