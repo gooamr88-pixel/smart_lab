@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
@@ -67,7 +68,7 @@ class UnifiedAiService {
       );
       return AiResponse.fromGeminiResponse(rawJson);
     } catch (e) {
-      print('[UnifiedAiService] ⚠️ Groq request failed: $e');
+      debugPrint('[UnifiedAiService] ⚠️ Groq request failed: $e');
     }
 
     // ── Groq failed — return friendly error ──
@@ -130,7 +131,7 @@ class UnifiedAiService {
         .timeout(_timeout);
 
     if (response.statusCode != 200) {
-      print('[UnifiedAiService] ❌ Groq HTTP ${response.statusCode}: '
+      debugPrint('[UnifiedAiService] ❌ Groq HTTP ${response.statusCode}: '
           '${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
       throw Exception('Groq returned HTTP ${response.statusCode}');
     }
@@ -139,7 +140,7 @@ class UnifiedAiService {
     final choices = decoded['choices'] as List<dynamic>?;
 
     if (choices == null || choices.isEmpty) {
-      print('[UnifiedAiService] ❌ Groq response contained no choices');
+      debugPrint('[UnifiedAiService] ❌ Groq response contained no choices');
       throw Exception('Groq response contained no choices');
     }
 
@@ -147,7 +148,7 @@ class UnifiedAiService {
         (choices[0]['message'] as Map<String, dynamic>)['content'] as String?;
 
     if (content == null || content.trim().isEmpty) {
-      print('[UnifiedAiService] ❌ Groq response content was empty');
+      debugPrint('[UnifiedAiService] ❌ Groq response content was empty');
       throw Exception('Groq response content was empty');
     }
 
