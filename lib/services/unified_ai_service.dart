@@ -3,34 +3,38 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 
 import '../models/ai_response.dart';
 import '../models/chat_message.dart';
 
-/// Production-ready AI service powered exclusively by Groq (Llama-3 70B).
+/// Production-ready AI service with Groq → Gemini fallback.
 ///
 /// Flow:
-///   1. Call Groq with a 15-second timeout.
-///   2. If Groq fails (timeout, non-200, parse error) → return a friendly
-///      error [AiResponse] immediately.
+///   1. Call Groq (Llama-3.3-70B) with a 15-second timeout.
+///   2. If Groq fails (timeout, non-200, parse error) → try Gemini 2.5 Flash.
+///   3. If both fail → return a friendly error [AiResponse].
 ///
-/// API key is loaded from `.env` via `flutter_dotenv`:
-///   `GROK_KEY` → primary, `HF_KEY` → fallback env var name.
+/// API keys loaded from `.env` via `flutter_dotenv`:
+///   `GROK_KEY` → Groq key, `GEMINI_KEY` → Gemini fallback key.
 class UnifiedAiService {
   // ═══════════════════════════════════════════════════════════════
   //  Configuration
   // ═══════════════════════════════════════════════════════════════
 
-  static String get _apiKey =>
+  static String get _groqApiKey =>
       dotenv.env['GROK_KEY'] ?? dotenv.env['HF_KEY'] ?? '';
 
-  static const String _model = 'llama3-70b-8192';
+  static String get _geminiApiKey => dotenv.env['GEMINI_KEY'] ?? '';
 
-  static const String _endpoint =
+  // Use llama-3.3-70b-versatile which properly supports response_format: json_object
+  static const String _groqModel = 'llama-3.3-70b-versatile';
+
+  static const String _groqEndpoint =
       'https://api.groq.com/openai/v1/chat/completions';
 
-  static const Duration _timeout = Duration(seconds: 15);
+  static const Duration _groqTimeout = Duration(seconds: 15);
 
   // ═══════════════════════════════════════════════════════════════
   //  Singleton
@@ -40,11 +44,21 @@ class UnifiedAiService {
   factory UnifiedAiService() => _instance;
   UnifiedAiService._internal();
 
+  // Lazy-initialised Gemini model for fallback
+  GenerativeModel? _geminiModel;
+  GenerativeModel get _gemini {
+    _geminiModel ??= GenerativeModel(
+      model: 'gemini-2.5-flash',
+      apiKey: _geminiApiKey,
+    );
+    return _geminiModel!;
+  }
+
   // ═══════════════════════════════════════════════════════════════
   //  Public Orchestrator
   // ═══════════════════════════════════════════════════════════════
 
-  /// Sends a structured AI request to Groq.
+  /// Sends a structured AI request.
   ///
   /// [message]  — the user's current input
   /// [mode]     — `'lab'` or `'quiz'` (selects system prompt)
@@ -60,18 +74,49 @@ class UnifiedAiService {
   }) async {
     final systemPrompt = _buildSystemPrompt(mode: mode, isArabic: isArabic);
 
+    // Filter history: only include actual user/AI conversation turns,
+    // skip the initial greeting message (it's not a real AI response and
+    // its plain-text format confuses the model into mirroring non-JSON).
+    final filteredHistory = _filterHistory(history);
+
+    // ── Attempt 1: Groq (primary) ──
     try {
+      debugPrint('[UnifiedAiService] 🚀 Attempting Groq...');
       final rawJson = await _callGroq(
         systemPrompt: systemPrompt,
         message: message,
-        history: history,
+        history: filteredHistory,
       );
-      return AiResponse.fromGeminiResponse(rawJson);
-    } catch (e) {
-      debugPrint('[UnifiedAiService] ⚠️ Groq request failed: $e');
+      debugPrint('[UnifiedAiService] ✅ Groq responded (${rawJson.length} chars)');
+      final cleaned = _stripMarkdownWrapper(rawJson);
+      return AiResponse.fromGeminiResponse(cleaned);
+    } catch (e, st) {
+      debugPrint('[UnifiedAiService] ⚠️ Groq failed: $e');
+      debugPrint('[UnifiedAiService] Stack: $st');
     }
 
-    // ── Groq failed — return friendly error ──
+    // ── Attempt 2: Gemini (fallback) ──
+    if (_geminiApiKey.isNotEmpty) {
+      try {
+        debugPrint('[UnifiedAiService] 🔄 Falling back to Gemini...');
+        final rawJson = await _callGemini(
+          systemPrompt: systemPrompt,
+          message: message,
+          history: filteredHistory,
+          isArabic: isArabic,
+        );
+        debugPrint('[UnifiedAiService] ✅ Gemini responded (${rawJson.length} chars)');
+        final cleaned = _stripMarkdownWrapper(rawJson);
+        return AiResponse.fromGeminiResponse(cleaned);
+      } catch (e, st) {
+        debugPrint('[UnifiedAiService] ⚠️ Gemini fallback also failed: $e');
+        debugPrint('[UnifiedAiService] Stack: $st');
+      }
+    } else {
+      debugPrint('[UnifiedAiService] ⚠️ GEMINI_KEY not set, skipping fallback');
+    }
+
+    // ── Both failed — return friendly error ──
     return AiResponse(
       action: 'message',
       message: isArabic
@@ -93,7 +138,7 @@ class UnifiedAiService {
     required String message,
     required List<ChatMessage> history,
   }) async {
-    if (_apiKey.isEmpty) {
+    if (_groqApiKey.isEmpty) {
       throw Exception('GROK_KEY not configured in .env');
     }
 
@@ -112,31 +157,44 @@ class UnifiedAiService {
     messages.add({'role': 'user', 'content': message});
 
     final body = jsonEncode({
-      'model': _model,
+      'model': _groqModel,
       'messages': messages,
       'response_format': {'type': 'json_object'},
       'temperature': 0.7,
       'max_tokens': 2048,
     });
 
+    debugPrint('[UnifiedAiService] 📤 Groq request: model=$_groqModel, '
+        'messages=${messages.length}, timeout=${_groqTimeout.inSeconds}s');
+
     final response = await http
         .post(
-          Uri.parse(_endpoint),
+          Uri.parse(_groqEndpoint),
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $_apiKey',
+            'Authorization': 'Bearer $_groqApiKey',
           },
           body: body,
         )
-        .timeout(_timeout);
+        .timeout(_groqTimeout);
 
     if (response.statusCode != 200) {
-      debugPrint('[UnifiedAiService] ❌ Groq HTTP ${response.statusCode}: '
-          '${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+      final preview = response.body.length > 300
+          ? response.body.substring(0, 300)
+          : response.body;
+      debugPrint('[UnifiedAiService] ❌ Groq HTTP ${response.statusCode}: $preview');
       throw Exception('Groq returned HTTP ${response.statusCode}');
     }
 
-    final decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    // Safely decode the response
+    final Map<String, dynamic> decoded;
+    try {
+      decoded = jsonDecode(response.body) as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('[UnifiedAiService] ❌ Failed to decode Groq response body: $e');
+      throw Exception('Groq response was not valid JSON');
+    }
+
     final choices = decoded['choices'] as List<dynamic>?;
 
     if (choices == null || choices.isEmpty) {
@@ -144,20 +202,126 @@ class UnifiedAiService {
       throw Exception('Groq response contained no choices');
     }
 
-    final content =
-        (choices[0]['message'] as Map<String, dynamic>)['content'] as String?;
+    // Safely navigate: choices[0] -> message -> content
+    final firstChoice = choices[0];
+    if (firstChoice is! Map<String, dynamic>) {
+      debugPrint('[UnifiedAiService] ❌ Groq choices[0] is not a Map');
+      throw Exception('Groq choices[0] is not a Map');
+    }
+
+    final messageObj = firstChoice['message'];
+    if (messageObj is! Map<String, dynamic>) {
+      debugPrint('[UnifiedAiService] ❌ Groq choices[0].message is not a Map');
+      throw Exception('Groq choices[0].message is not a Map');
+    }
+
+    final content = messageObj['content'] as String?;
 
     if (content == null || content.trim().isEmpty) {
       debugPrint('[UnifiedAiService] ❌ Groq response content was empty');
       throw Exception('Groq response content was empty');
     }
 
+    debugPrint('[UnifiedAiService] 📥 Groq raw content: '
+        '${content.length > 200 ? '${content.substring(0, 200)}...' : content}');
+
     return content;
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  System Prompt Builder
+  //  Gemini Fallback Call
   // ═══════════════════════════════════════════════════════════════
+
+  /// Calls Google Gemini as a fallback when Groq fails.
+  Future<String> _callGemini({
+    required String systemPrompt,
+    required String message,
+    required List<ChatMessage> history,
+    required bool isArabic,
+  }) async {
+    // Build conversation history for the Gemini chat session
+    final historyContent = <Content>[];
+
+    for (final msg in history) {
+      if (msg.isUser) {
+        historyContent.add(Content('user', [TextPart(msg.text)]));
+      } else {
+        historyContent.add(Content('model', [TextPart(msg.text)]));
+      }
+    }
+
+    // Start a chat session with system instruction baked in
+    final chat = _gemini.startChat(
+      history: [
+        Content('user', [TextPart(systemPrompt)]),
+        Content('model', [
+          TextPart(isArabic
+              ? 'فهمت. سأرد دائماً بصيغة JSON المطلوبة.'
+              : 'Understood. I will always respond in the required JSON format.')
+        ]),
+        ...historyContent,
+      ],
+    );
+
+    final response = await chat.sendMessage(Content.text(message));
+    final rawText = response.text ?? '';
+
+    if (rawText.trim().isEmpty) {
+      throw Exception('Gemini response was empty');
+    }
+
+    debugPrint('[UnifiedAiService] 📥 Gemini raw content: '
+        '${rawText.length > 200 ? '${rawText.substring(0, 200)}...' : rawText}');
+
+    return rawText;
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  //  Helpers
+  // ═══════════════════════════════════════════════════════════════
+
+  /// Strips markdown code-block wrappers from the AI response.
+  ///
+  /// Handles:
+  ///   - ```json ... ```
+  ///   - ``` ... ```  (bare, no language tag)
+  ///   - Leading/trailing whitespace
+  static String _stripMarkdownWrapper(String raw) {
+    var cleaned = raw.trim();
+
+    // Remove ```json ... ``` wrapper
+    final jsonBlockMatch =
+        RegExp(r'^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$').firstMatch(cleaned);
+    if (jsonBlockMatch != null) {
+      cleaned = jsonBlockMatch.group(1)!.trim();
+    }
+
+    return cleaned;
+  }
+
+  /// Filters history to only include real conversation turns.
+  ///
+  /// Removes the initial greeting message (first AI message that has no
+  /// aiResponse attached) to prevent poisoning the model context with
+  /// a non-JSON assistant message.
+  static List<ChatMessage> _filterHistory(List<ChatMessage> history) {
+    if (history.isEmpty) return history;
+
+    // Skip the very first message if it's an AI greeting (not user, no aiResponse)
+    final filtered = <ChatMessage>[];
+    bool skippedGreeting = false;
+
+    for (final msg in history) {
+      if (!skippedGreeting && !msg.isUser && msg.aiResponse == null) {
+        // This is the greeting — skip it
+        skippedGreeting = true;
+        continue;
+      }
+      filtered.add(msg);
+    }
+
+    return filtered;
+  }
 
   /// Selects the correct system prompt based on [mode] and [isArabic].
   String _buildSystemPrompt({

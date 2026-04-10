@@ -142,11 +142,12 @@ class AiResponse {
   /// Extracts the first valid JSON object `{...}` from the raw text,
   /// handling nested braces correctly.
   static String? _extractJsonObject(String raw) {
-    // First, try to find JSON inside ```json ... ``` code blocks
+    // First, try to find JSON inside ```json ... ``` or bare ``` ... ``` code blocks
+    // Handles: ```json, ```JSON, ``` (bare), ```text, etc.
     final codeBlockMatch =
-        RegExp(r'```json\s*(\{[\s\S]*?\})\s*```').firstMatch(raw);
+        RegExp(r'```(?:json|JSON)?\s*\n?([\s\S]*?)\n?\s*```').firstMatch(raw);
     if (codeBlockMatch != null) {
-      final candidate = codeBlockMatch.group(1)!;
+      final candidate = codeBlockMatch.group(1)!.trim();
       if (_isValidJson(candidate)) return candidate;
     }
 
