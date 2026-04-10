@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import '../models/ai_response.dart';
 import '../models/chat_message.dart';
-import '../services/gemini_service.dart';
+import '../services/unified_ai_service.dart';
 
 /// State management for the Smart Chat orchestrator.
 ///
 /// Manages message history, loading state, quiz answer tracking,
 /// and delegates AI calls to [GeminiService.sendSmartRequest].
 class SmartChatProvider extends ChangeNotifier {
-  final GeminiService _gemini = GeminiService();
+  final UnifiedAiService _ai = UnifiedAiService();
 
   final List<ChatMessage> _messages = [];
   String _mode = 'lab';
@@ -67,24 +67,12 @@ class SmartChatProvider extends ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
-    // Check API configuration
-    if (!_gemini.isConfigured) {
-      _messages.add(ChatMessage.ai(
-        isArabic
-            ? '⚠️ لم يتم العثور على مفتاح GEMINI_KEY في ملف .env'
-            : '⚠️ GEMINI_KEY not found in .env file',
-      ));
-      _isLoading = false;
-      notifyListeners();
-      return;
-    }
-
     try {
       // Build history (skip greeting and current user message)
       // We pass all prior messages so the AI has conversational context
       final history = _messages.sublist(0, _messages.length - 1);
 
-      final response = await _gemini.sendSmartRequest(
+      final response = await _ai.sendSmartRequest(
         message: text.trim(),
         mode: _mode,
         history: history,
