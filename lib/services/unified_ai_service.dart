@@ -1,37 +1,35 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:google_generative_ai/google_generative_ai.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
-import '../core/utils/env_config.dart';
 import '../models/ai_response.dart';
 import '../models/chat_message.dart';
 
-/// Production-ready AI service with automatic failover.
-///
-/// **Primary engine** : Groq (Llama-3 70B) — fast, cheap, JSON-strict.
-/// **Fallback engine**: Gemini 2.5 Flash — reliable Google-hosted model.
+/// Production-ready AI service powered exclusively by Groq (Llama-3 70B).
 ///
 /// Flow:
-///   1. Try Groq with an 8-second timeout.
-///   2. If Groq fails (timeout, non-200, parse error) → try Gemini.
-///   3. If both fail → return a friendly error [AiResponse].
+///   1. Call Groq with a 15-second timeout.
+///   2. If Groq fails (timeout, non-200, parse error) → return a friendly
+///      error [AiResponse] immediately.
+///
+/// API key is loaded from `.env` via `flutter_dotenv`:
+///   `GROK_KEY` → primary, `HF_KEY` → fallback env var name.
 class UnifiedAiService {
   // ═══════════════════════════════════════════════════════════════
-  //  API Configuration (keys loaded from .env via EnvConfig)
+  //  Configuration
   // ═══════════════════════════════════════════════════════════════
 
-  static String get _groqApiKey => EnvConfig.grokKey;
-  static String get _geminiApiKey => EnvConfig.geminiKey;
+  static String get _apiKey =>
+      dotenv.env['GROK_KEY'] ?? dotenv.env['HF_KEY'] ?? '';
 
-  static const String _groqModel = 'llama3-70b-8192';
-  static const String _geminiModel = 'gemini-2.5-flash';
+  static const String _model = 'llama3-70b-8192';
 
-  static const String _groqEndpoint =
+  static const String _endpoint =
       'https://api.groq.com/openai/v1/chat/completions';
 
-  static const Duration _groqTimeout = Duration(seconds: 8);
+  static const Duration _timeout = Duration(seconds: 15);
 
   // ═══════════════════════════════════════════════════════════════
   //  Singleton
@@ -41,21 +39,11 @@ class UnifiedAiService {
   factory UnifiedAiService() => _instance;
   UnifiedAiService._internal();
 
-  /// Lazily-initialised Gemini model (fallback).
-  GenerativeModel? _geminiModelInstance;
-  GenerativeModel get _gemini {
-    _geminiModelInstance ??= GenerativeModel(
-      model: _geminiModel,
-      apiKey: _geminiApiKey,
-    );
-    return _geminiModelInstance!;
-  }
-
   // ═══════════════════════════════════════════════════════════════
   //  Public Orchestrator
   // ═══════════════════════════════════════════════════════════════
 
-  /// Sends a structured AI request with automatic Groq → Gemini failover.
+  /// Sends a structured AI request to Groq.
   ///
   /// [message]  — the user's current input
   /// [mode]     — `'lab'` or `'quiz'` (selects system prompt)
@@ -71,7 +59,6 @@ class UnifiedAiService {
   }) async {
     final systemPrompt = _buildSystemPrompt(mode: mode, isArabic: isArabic);
 
-    // ── Attempt 1: Groq (primary) ──
     try {
       final rawJson = await _callGroq(
         systemPrompt: systemPrompt,
@@ -80,24 +67,10 @@ class UnifiedAiService {
       );
       return AiResponse.fromGeminiResponse(rawJson);
     } catch (e) {
-      // Groq failed — fall through to Gemini
-      _log('⚠️ Groq failed: $e — falling back to Gemini');
+      print('[UnifiedAiService] ⚠️ Groq request failed: $e');
     }
 
-    // ── Attempt 2: Gemini (fallback) ──
-    try {
-      final rawJson = await _callGemini(
-        systemPrompt: systemPrompt,
-        message: message,
-        history: history,
-        isArabic: isArabic,
-      );
-      return AiResponse.fromGeminiResponse(rawJson);
-    } catch (e) {
-      _log('⚠️ Gemini fallback also failed: $e');
-    }
-
-    // ── Both failed ──
+    // ── Groq failed — return friendly error ──
     return AiResponse(
       action: 'message',
       message: isArabic
@@ -107,7 +80,7 @@ class UnifiedAiService {
   }
 
   // ═══════════════════════════════════════════════════════════════
-  //  Groq — Primary Engine
+  //  Groq HTTP Call
   // ═══════════════════════════════════════════════════════════════
 
   /// Calls the Groq REST API (OpenAI-compatible).
@@ -119,6 +92,10 @@ class UnifiedAiService {
     required String message,
     required List<ChatMessage> history,
   }) async {
+    if (_apiKey.isEmpty) {
+      throw Exception('GROK_KEY not configured in .env');
+    }
+
     // Build the messages array (system + history + user)
     final messages = <Map<String, String>>[
       {'role': 'system', 'content': systemPrompt},
@@ -134,7 +111,7 @@ class UnifiedAiService {
     messages.add({'role': 'user', 'content': message});
 
     final body = jsonEncode({
-      'model': _groqModel,
+      'model': _model,
       'messages': messages,
       'response_format': {'type': 'json_object'},
       'temperature': 0.7,
@@ -143,25 +120,26 @@ class UnifiedAiService {
 
     final response = await http
         .post(
-          Uri.parse(_groqEndpoint),
+          Uri.parse(_endpoint),
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': 'Bearer $_groqApiKey',
+            'Authorization': 'Bearer $_apiKey',
           },
           body: body,
         )
-        .timeout(_groqTimeout);
+        .timeout(_timeout);
 
     if (response.statusCode != 200) {
-      throw Exception(
-        'Groq returned HTTP ${response.statusCode}: ${response.body}',
-      );
+      print('[UnifiedAiService] ❌ Groq HTTP ${response.statusCode}: '
+          '${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+      throw Exception('Groq returned HTTP ${response.statusCode}');
     }
 
     final decoded = jsonDecode(response.body) as Map<String, dynamic>;
     final choices = decoded['choices'] as List<dynamic>?;
 
     if (choices == null || choices.isEmpty) {
+      print('[UnifiedAiService] ❌ Groq response contained no choices');
       throw Exception('Groq response contained no choices');
     }
 
@@ -169,58 +147,11 @@ class UnifiedAiService {
         (choices[0]['message'] as Map<String, dynamic>)['content'] as String?;
 
     if (content == null || content.trim().isEmpty) {
+      print('[UnifiedAiService] ❌ Groq response content was empty');
       throw Exception('Groq response content was empty');
     }
 
     return content;
-  }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  Gemini — Fallback Engine
-  // ═══════════════════════════════════════════════════════════════
-
-  /// Calls Google Gemini via the `google_generative_ai` SDK.
-  ///
-  /// Uses a chat session with seeded system instruction so the model
-  /// stays in JSON-only mode throughout the conversation.
-  Future<String> _callGemini({
-    required String systemPrompt,
-    required String message,
-    required List<ChatMessage> history,
-    required bool isArabic,
-  }) async {
-    // Build history contents
-    final historyContent = <Content>[];
-
-    for (final msg in history) {
-      if (msg.isUser) {
-        historyContent.add(Content('user', [TextPart(msg.text)]));
-      } else {
-        historyContent.add(Content('model', [TextPart(msg.text)]));
-      }
-    }
-
-    // Start a chat session with the system prompt seeded as the first exchange
-    final chat = _gemini.startChat(
-      history: [
-        Content('user', [TextPart(systemPrompt)]),
-        Content('model', [
-          TextPart(isArabic
-              ? 'فهمت. سأرد دائماً بصيغة JSON المطلوبة.'
-              : 'Understood. I will always respond in the required JSON format.')
-        ]),
-        ...historyContent,
-      ],
-    );
-
-    final response = await chat.sendMessage(Content.text(message));
-    final rawText = response.text ?? '';
-
-    if (rawText.trim().isEmpty) {
-      throw Exception('Gemini returned an empty response');
-    }
-
-    return rawText;
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -237,26 +168,14 @@ class UnifiedAiService {
     }
     return isArabic ? _Prompts.quizAr : _Prompts.quizEn;
   }
-
-  // ═══════════════════════════════════════════════════════════════
-  //  Logger (debug only)
-  // ═══════════════════════════════════════════════════════════════
-
-  void _log(String msg) {
-    assert(() {
-      // ignore: avoid_print
-      print('[UnifiedAiService] $msg');
-      return true;
-    }());
-  }
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  System Prompts — Identical semantics for both engines
+//  System Prompts
 // ─────────────────────────────────────────────────────────────────
 
-/// Private prompt constants for the unified AI orchestrator.
-/// These enforce strict JSON output from both Groq and Gemini.
+/// Private prompt constants for the AI orchestrator.
+/// These enforce strict JSON output from the Groq model.
 class _Prompts {
   _Prompts._();
 
