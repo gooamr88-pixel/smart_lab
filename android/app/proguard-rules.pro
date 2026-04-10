@@ -31,3 +31,7 @@
 -keepattributes *Annotation*
 -keepattributes Signature
 -keepattributes InnerClasses,EnclosingMethod
+
+## 🚨 الحل الخاص بمشكلة الـ Build الأخيرة (Play Core) 🚨
+-dontwarn com.google.android.play.core.**
+-dontwarn io.flutter.embedding.engine.deferredcomponents.**
