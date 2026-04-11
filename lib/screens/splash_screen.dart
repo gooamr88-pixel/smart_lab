@@ -292,7 +292,7 @@ class _SplashScreenState extends State<SplashScreen>
                     child: FadeTransition(
                       opacity: _titleOpacity,
                       child: Text(
-                        'Smart Lab',
+                        'Skillify',
                         style: GoogleFonts.inter(
                           fontSize: 48,
                           fontWeight: FontWeight.w800,
@@ -309,7 +309,7 @@ class _SplashScreenState extends State<SplashScreen>
                   FadeTransition(
                     opacity: _subtitleOpacity,
                     child: Text(
-                      'المعمل الذكي التفاعلي',
+                      'طوّر مهاراتك بذكاء',
                       style: GoogleFonts.cairo(
                         fontSize: 20,
                         fontWeight: FontWeight.w500,

@@ -1,12 +1,12 @@
-/// Arabic UI strings for Smart Lab
+/// Arabic UI strings for Skillify
 const Map<String, String> arStrings = {
   // Splash Screen
   'start': 'ابدأ',
-  'splash_subtitle': 'مختبرك الافتراضي الذكي',
+  'splash_subtitle': 'طوّر مهاراتك بذكاء',
 
   // Welcome Screen
-  'app_name': 'Smart Lab',
-  'app_subtitle': 'المعمل الذكي التفاعلي',
+  'app_name': 'Skillify',
+  'app_subtitle': 'طوّر مهاراتك بذكاء',
   'app_description': 'مختبرك الافتراضي للكيمياء والفيزياء',
   'choose_language': 'اختر اللغة',
   'arabic_version': 'النسخة العربية',

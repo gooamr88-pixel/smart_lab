@@ -43,8 +43,8 @@ class SmartChatProvider extends ChangeNotifier {
 
     final greeting = mode == 'lab'
         ? (isArabic
-            ? 'أهلاً بك في المعمل الذكي! 🔬\nأخبرني عن الموضوع العلمي الذي تريد استكشافه وسأشرحه لك ثم نجهز المعمل الافتراضي.'
-            : 'Welcome to Smart Lab! 🔬\nTell me the science topic you want to explore and I\'ll explain it, then we\'ll prepare the virtual lab.')
+            ? 'أهلاً بك في Skillify! 🔬\nأخبرني عن الموضوع العلمي الذي تريد استكشافه وسأشرحه لك ثم نجهز المعمل الافتراضي.'
+            : 'Welcome to Skillify! 🔬\nTell me the science topic you want to explore and I\'ll explain it, then we\'ll prepare the virtual lab.')
         : (isArabic
             ? 'أهلاً بك في الاختبار الذكي! 🧠\nأخبرني بالمادة والموضوع الذي تريد اختبار نفسك فيه.'
             : 'Welcome to Smart Quiz! 🧠\nTell me the subject and topic you\'d like to test yourself on.');

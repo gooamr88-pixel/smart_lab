@@ -213,13 +213,13 @@ class SettingsScreen extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        const Text('🔬', style: TextStyle(fontSize: 28)),
+                        const Text('🚀', style: TextStyle(fontSize: 28)),
                         const SizedBox(width: 12),
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              'Smart Lab',
+                              'Skillify',
                               style: GoogleFonts.inter(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,

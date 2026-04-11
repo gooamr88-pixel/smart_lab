@@ -6,6 +6,8 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_generative_ai/google_generative_ai.dart';
 import 'package:http/http.dart' as http;
 
+import '../data/chem_reactions_db.dart';
+import '../data/physics_experiments_db.dart';
 import '../models/ai_response.dart';
 import '../models/chat_message.dart';
 
@@ -324,12 +326,38 @@ class UnifiedAiService {
   }
 
   /// Selects the correct system prompt based on [mode] and [isArabic].
+  ///
+  /// For lab mode, injects the list of 100 supported reactions so the AI
+  /// knows exactly which experiments are available and can route correctly.
   String _buildSystemPrompt({
     required String mode,
     required bool isArabic,
   }) {
     if (mode == 'lab') {
-      return isArabic ? _Prompts.labAr : _Prompts.labEn;
+      final basePrompt = isArabic ? _Prompts.labAr : _Prompts.labEn;
+      final reactionList = isArabic
+          ? ChemDB.supportedReactionNamesAr.join('، ')
+          : ChemDB.supportedReactionNamesEn.join(', ');
+      final suffix = isArabic
+          ? '''
+\n\n📋 التفاعلات المتاحة في المعمل الافتراضي (100 تفاعل):
+$reactionList
+
+⚠️ قاعدة مهمة جداً:
+- لو الطالب طلب تفاعل موجود في القائمة أعلاه → أرسل open_lab بالأدوات المناسبة.
+- لو الطالب طلب تفاعل مش موجود في القائمة → اردد: "هذا التفاعل هيتوفر قريباً إن شاء الله! 🔜 جرب تسألني عن تفاعل تاني من الـ 100 تفاعل المتاحين."
+- لا تخترع أدوات أو تفاعلات غير موجودة في القائمة.
+'''
+          : '''
+\n\n📋 Available reactions in the virtual lab (100 reactions):
+$reactionList
+
+⚠️ CRITICAL RULE:
+- If the student asks for a reaction IN the list above → send open_lab with the correct tools.
+- If the student asks for a reaction NOT in the list → reply: "This reaction will be available soon! 🔜 Try asking about one of our 100 available reactions."
+- Do NOT invent tools or reactions not in the list.
+''';
+      return basePrompt + suffix;
     }
     return isArabic ? _Prompts.quizAr : _Prompts.quizEn;
   }
@@ -345,8 +373,8 @@ class _Prompts {
   _Prompts._();
 
   // ─── LAB MODE (Arabic) ───
-  static const String labAr = '''
-أنت معلم علوم ذكي اسمك "سمارت لاب". أنت تعمل داخل تطبيق تعليمي تفاعلي.
+  static String get labAr => '''
+أنت معلم علوم ذكي اسمك "Skillify". أنت تعمل داخل تطبيق تعليمي تفاعلي.
 
 دورك:
 1. الطالب سيسألك عن موضوع علمي (كيمياء أو فيزياء).
@@ -369,11 +397,34 @@ class _Prompts {
 - للفيزياء: الأدوات مثل (مدفع، كرة، مقياس زاوية، ساعة إيقاف، مسار مقذوف).
 - اجعل الشرح ممتعاً واستخدم إيموجي مناسبة 🔬.
 - عندما يطلب الطالب "تجربة" أو "معمل" أو "أريد أجرب"، أرسل open_lab فوراً.
+
+🧪 التفاعلات الكيميائية المتاحة حالياً في المعمل:
+${ChemDB.supportedReactionNamesAr.join(' | ')}
+
+⚠️ قاعدة مهمة جداً:
+- إذا طلب الطالب تفاعلاً كيميائياً غير موجود في القائمة أعلاه، يجب أن ترد:
+{"action": "message", "message": "هذا التفاعل هيتوفر قريباً! 🔜 جرب واحد من التفاعلات المتاحة حالياً."}
+- لا ترسل open_lab أبداً لتفاعل غير موجود في القائمة.
+- لتفاعلات الكيمياء: استخدم فقط الأدوات المذكورة في القائمة.
+
+🧲 التجارب الفيزيائية المتاحة حالياً في المعمل:
+${PhysicsDB.supportedExperimentNamesAr.join(' | ')}
+
+لفتح تجربة فيزيائية، استخدم هذا الشكل:
+{"action": "open_lab", "subject": "فيزياء", "experiment": "experiment_id", "params": {"key": value}, "message": "نص تمهيدي", "tools": []}
+
+معرفات التجارب المتاحة:
+${PhysicsDB.experiments.where((e) => e.hasSimulation).map((e) => '${e.id} = ${e.nameAr}').join(' | ')}
+
+⚠️ قاعدة مهمة جداً للفيزياء:
+- إذا طلب الطالب تجربة فيزيائية غير موجودة في القائمة أعلاه أو simType = none، يجب أن ترد:
+{"action": "message", "message": "هذه التجربة هتتوفر قريباً! 🔜 جرب واحدة من التجارب المتاحة حالياً."}
+- لا ترسل open_lab أبداً لتجربة فيزيائية غير موجودة في القائمة.
 ''';
 
   // ─── LAB MODE (English) ───
-  static const String labEn = '''
-You are a smart science tutor called "Smart Lab". You work inside an interactive educational app.
+  static String get labEn => '''
+You are a smart science tutor called "Skillify". You work inside an interactive educational app.
 
 Your role:
 1. The student will ask about a science topic (Chemistry or Physics).
@@ -396,11 +447,34 @@ Rules:
 - For physics: tools are equipment (e.g., cannon, ball, protractor, stopwatch, projectile trajectory).
 - Make explanations engaging and use appropriate emojis 🔬.
 - When the student says "experiment", "lab", "I want to try", send open_lab immediately.
+
+🧪 Currently available chemistry reactions in the virtual lab:
+${ChemDB.supportedReactionNamesEn.join(' | ')}
+
+⚠️ CRITICAL RULE:
+- If the student asks about a chemical reaction NOT in the list above, you MUST reply:
+{"action": "message", "message": "This reaction will be available soon! 🔜 Try one of the currently available reactions."}
+- NEVER send open_lab for a reaction not in the list.
+- For chemistry reactions: only use tools/reagents mentioned in the available list.
+
+🧲 Currently available PHYSICS experiments in the virtual lab:
+${PhysicsDB.supportedExperimentNamesEn.join(' | ')}
+
+To open a physics experiment, use this format:
+{"action": "open_lab", "subject": "physics", "experiment": "experiment_id", "params": {"key": value}, "message": "Introductory text", "tools": []}
+
+Available experiment IDs:
+${PhysicsDB.experiments.where((e) => e.hasSimulation).map((e) => '${e.id} = ${e.name}').join(' | ')}
+
+⚠️ CRITICAL RULE FOR PHYSICS:
+- If the student asks about a physics experiment NOT in the list above, you MUST reply:
+{"action": "message", "message": "This experiment will be available soon! 🔜 Try one of the currently available experiments."}
+- NEVER send open_lab for a physics experiment not in the list.
 ''';
 
   // ─── QUIZ MODE (Arabic) ───
   static const String quizAr = '''
-أنت مقيّم علمي ذكي اسمك "سمارت لاب". أنت تعمل داخل تطبيق تعليمي تفاعلي.
+أنت مقيّم علمي ذكي اسمك "Skillify". أنت تعمل داخل تطبيق تعليمي تفاعلي.
 
 دورك:
 1. الطالب سيخبرك بالموضوع الذي يريد اختبار نفسه فيه.
@@ -428,7 +502,7 @@ Rules:
 
   // ─── QUIZ MODE (English) ───
   static const String quizEn = '''
-You are a smart science evaluator called "Smart Lab". You work inside an interactive educational app.
+You are a smart science evaluator called "Skillify". You work inside an interactive educational app.
 
 Your role:
 1. The student will tell you the topic they want to be tested on.

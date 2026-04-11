@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'quiz_question.dart';
+import '../data/physics_experiments_db.dart';
 
 /// Unified AI response model for the Smart Chat orchestrator.
 ///
@@ -25,12 +26,24 @@ class AiResponse {
   /// Auto-detected from tool names if not provided by AI.
   final String subject;
 
+  /// Physics experiment ID from the database (e.g. 'free_fall', 'simple_pendulum')
+  final String? experimentId;
+
+  /// Default parameters for the physics simulation (e.g. {'height': 20, 'mass': 5})
+  final Map<String, double>? experimentParams;
+
+  /// Resolved physics experiment info from the database
+  PhysicsExperimentInfo? get physicsExperiment =>
+      experimentId != null ? PhysicsDB.findById(experimentId!) : null;
+
   const AiResponse({
     required this.action,
     required this.message,
     this.tools = const [],
     this.questions = const [],
     this.subject = 'chemistry',
+    this.experimentId,
+    this.experimentParams,
   });
 
   /// Creates a plain text response (no special action)
@@ -107,11 +120,25 @@ class AiResponse {
               : rawSubject == 'chemistry' || rawSubject == 'كيمياء'
                   ? 'chemistry'
                   : _detectSubject(toolsList);
+
+          // Parse physics experiment fields
+          final expId = json['experiment'] as String?;
+          final rawParams = json['params'];
+          Map<String, double>? expParams;
+          if (rawParams is Map) {
+            expParams = {};
+            rawParams.forEach((k, v) {
+              if (v is num) expParams![k.toString()] = v.toDouble();
+            });
+          }
+
           return AiResponse(
             action: 'open_lab',
             message: combinedMessage,
             tools: toolsList,
             subject: detectedSubject,
+            experimentId: expId,
+            experimentParams: expParams,
           );
 
         case 'start_quiz':
@@ -253,6 +280,7 @@ class AiResponse {
   @override
   String toString() =>
       'AiResponse(action: $action, subject: $subject, '
+      'experiment: $experimentId, '
       'message: ${message.length > 50 ? '${message.substring(0, 50)}...' : message}, '
       'tools: ${tools.length}, questions: ${questions.length})';
 }

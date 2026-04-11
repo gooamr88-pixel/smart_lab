@@ -14,7 +14,8 @@ import '../services/model_assets.dart';
 /// 2. Free Fall
 /// 3. Pendulum
 class PhysicsSimulationScreen extends StatefulWidget {
-  const PhysicsSimulationScreen({super.key});
+  final int initialTabIndex;
+  const PhysicsSimulationScreen({super.key, this.initialTabIndex = 0});
 
   @override
   State<PhysicsSimulationScreen> createState() => _PhysicsSimulationScreenState();
@@ -22,7 +23,13 @@ class PhysicsSimulationScreen extends StatefulWidget {
 
 class _PhysicsSimulationScreenState extends State<PhysicsSimulationScreen>
     with TickerProviderStateMixin {
-  int _selectedSimIndex = 0;
+  late int _selectedSimIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedSimIndex = widget.initialTabIndex.clamp(0, 4);
+  }
 
   @override
   Widget build(BuildContext context) {

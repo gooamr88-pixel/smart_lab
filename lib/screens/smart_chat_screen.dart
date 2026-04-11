@@ -12,6 +12,7 @@ import '../models/skill_area.dart';
 import '../widgets/chat_bubble.dart';
 import 'chem_lab_screen.dart';
 import 'physics_lab_screen.dart';
+import 'physics_simulation_screen.dart';
 
 /// Reusable AI-driven chat screen with dual-mode support.
 ///
@@ -97,10 +98,30 @@ class _SmartChatScreenState extends State<SmartChatScreen>
   }
 
   void _navigateToLab(AiResponse response) {
-    // Route to Physics or Chemistry lab based on detected subject
-    final Widget labScreen = response.isPhysics
-        ? const PhysicsLabScreen()
-        : ChemLabScreen(toolNames: response.tools);
+    Widget labScreen;
+
+    if (response.isPhysics) {
+      // Check if there's a specific experiment with a simulation
+      final experiment = response.physicsExperiment;
+      if (experiment != null && experiment.hasSimulation) {
+        if (experiment.simType == 'projectile') {
+          // Projectile motion uses the dedicated PhysicsLabScreen
+          labScreen = PhysicsLabScreen(
+            initialParams: response.experimentParams,
+          );
+        } else {
+          // All other sim types use the PhysicsSimulationScreen tabs
+          labScreen = PhysicsSimulationScreen(
+            initialTabIndex: experiment.simTabIndex ?? 0,
+          );
+        }
+      } else {
+        // Default: open PhysicsLabScreen (projectile)
+        labScreen = const PhysicsLabScreen();
+      }
+    } else {
+      labScreen = ChemLabScreen(toolNames: response.tools);
+    }
 
     Navigator.push(
       context,
@@ -211,8 +232,8 @@ class _SmartChatScreenState extends State<SmartChatScreen>
               children: [
                 Text(
                   isArabic
-                      ? (isLabMode ? 'المعمل الذكي' : 'الاختبار الذكي')
-                      : (isLabMode ? 'Smart Lab' : 'Smart Quiz'),
+                      ? (isLabMode ? 'معمل Skillify' : 'اختبار Skillify')
+                      : (isLabMode ? 'Skillify Lab' : 'Skillify Quiz'),
                   style: GoogleFonts.cairo(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,

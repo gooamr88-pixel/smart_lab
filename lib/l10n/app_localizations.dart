@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'lang/ar.dart';
 import 'lang/en.dart';
 
-/// Custom localization system for Smart Lab (Arabic / English)
+/// Custom localization system for Skillify (Arabic / English)
 class AppLocalizations {
   final Locale locale;
 

@@ -16,7 +16,7 @@ class SmartLabApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'بساريا',
+      title: 'Skillify',
 
       // Theme
       theme: AppTheme.darkTheme,

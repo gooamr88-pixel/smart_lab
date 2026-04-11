@@ -295,7 +295,7 @@ class _DashboardScreenState extends State<DashboardScreen>
                           Expanded(
                             child: _QuickAction(
                               emoji: '🔬',
-                              label: isArabic ? 'المعمل الذكي' : 'Virtual Lab',
+                              label: isArabic ? 'معمل Skillify' : 'Virtual Lab',
                               gradient: AppGradients.roadmapLab,
                               onTap: () => Navigator.push(
                                 context,

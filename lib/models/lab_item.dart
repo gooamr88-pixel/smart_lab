@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../data/chem_reactions_db.dart';
 
 /// Type classification for lab items
 enum LabItemType {
@@ -39,6 +40,57 @@ class LabItem {
   int get hashCode => id.hashCode;
 }
 
+// ═════════════════════════════════════════════════════════════════
+//  REACTION VISUAL EFFECTS SYSTEM
+// ═════════════════════════════════════════════════════════════════
+
+/// Visual effect types that can be combined to create unique reaction visuals.
+/// Each reaction has 1-4 [EffectLayer]s that render simultaneously.
+enum ReactionEffect {
+  /// Solid particles falling from liquid surface to bottom (ترسيب)
+  precipitate,
+
+  /// Vapor/smoke clouds rising above vessel (دخان/بخار)
+  smoke,
+
+  /// Bright sparking particles exploding outward (شرر)
+  sparks,
+
+  /// Colored flame dancing above liquid surface (لهب)
+  flame,
+
+  /// Dense foam dome erupting above surface (رغوة)
+  foam,
+
+  /// Color wave spreading through liquid (موجة لون)
+  colorWave,
+
+  /// Large bubbles + gas clouds above surface (تصاعد غاز)
+  gasRelease,
+
+  /// Intense colored thermal glow (توهج حراري)
+  glow,
+
+  /// Geometric crystal shapes growing (تبلور)
+  crystallize,
+
+  /// Ice crystal patterns on vessel walls — endothermic (تجمد)
+  frost,
+}
+
+/// A single visual effect layer with its own color, intensity, and size.
+///
+/// Reactions combine 1-4 [EffectLayer]s to achieve unique visuals.
+/// Example: Na + H₂O = [sparks(yellow), flame(yellow), gasRelease(white)]
+class EffectLayer {
+  final ReactionEffect type;
+  final Color color;
+  final double intensity; // 0.0-1.0 — density & speed
+  final double size;      // particle size multiplier (default 1.0)
+
+  const EffectLayer(this.type, this.color, [this.intensity = 0.7, this.size = 1.0]);
+}
+
 /// Defines a chemical reaction that occurs when specific reagents are combined.
 class ChemReaction {
   /// Set of [LabItem.id] values that must be present to trigger this reaction
@@ -64,6 +116,9 @@ class ChemReaction {
   final String description;
   final String descriptionAr;
 
+  /// Visual effect layers — each reaction has 1-4 unique effects
+  final List<EffectLayer> effects;
+
   const ChemReaction({
     required this.reagentIds,
     required this.resultColor,
@@ -74,6 +129,7 @@ class ChemReaction {
     this.heatIntensity = 0.0,
     this.description = '',
     this.descriptionAr = '',
+    this.effects = const [],
   });
 }
 
@@ -205,14 +261,15 @@ class LabItemRegistry {
     emoji: '🥽',
   );
 
-  /// All known items
-  static const List<LabItem> all = [
+  /// All known items (original + ChemDB)
+  static final List<LabItem> all = [
     water, sodium, hcl, naoh, vinegar, bakingSoda, copper, iron,
     phenolphthalein, litmus, beaker, flask, testTube,
     thermometer, stirrer, tongs, burner, scale, goggles,
+    ...ChemDB.chemicals,
   ];
 
-  /// Map for quick ID lookup
+  /// Map for quick ID lookup (rebuilt lazily after merge)
   static final Map<String, LabItem> _byId = {
     for (final item in all) item.id: item,
   };
@@ -225,15 +282,16 @@ class LabItemRegistry {
   // ─────────────────────────────────────────────────────────────
 
   /// Keyword map for fuzzy matching tool names from AI responses
+  /// Merges original keywords with the ChemDB extended keywords.
   static final Map<String, String> _keywords = {
-    // English keywords → item IDs
+    // ── Original keywords ──
     'water': 'water', 'h2o': 'water', 'مياه': 'water', 'ماء': 'water',
     'sodium': 'sodium', 'na': 'sodium', 'صوديوم': 'sodium',
     'hydrochloric': 'hcl', 'hcl': 'hcl', 'هيدروكلوريك': 'hcl', 'حمض': 'hcl',
     'hydroxide': 'naoh', 'naoh': 'naoh', 'هيدروكسيد': 'naoh', 'قاعدة': 'naoh',
     'vinegar': 'vinegar', 'acetic': 'vinegar', 'خل': 'vinegar',
     'baking': 'baking_soda', 'bicarbonate': 'baking_soda', 'بيكربونات': 'baking_soda',
-    'copper': 'copper', 'cuso4': 'copper', 'نحاس': 'copper', 'كبريتات': 'copper',
+    'copper sulfate': 'copper', 'cuso4': 'copper', 'كبريتات النحاس': 'copper',
     'iron': 'iron', 'nail': 'iron', 'حديد': 'iron', 'مسمار': 'iron',
     'phenolphthalein': 'phenolphthalein', 'فينول': 'phenolphthalein',
     'litmus': 'litmus', 'عباد': 'litmus',
@@ -246,6 +304,8 @@ class LabItemRegistry {
     'burner': 'burner', 'bunsen': 'burner', 'موقد': 'burner', 'بنزن': 'burner',
     'scale': 'scale', 'balance': 'scale', 'ميزان': 'scale',
     'goggles': 'goggles', 'safety': 'goggles', 'نظارات': 'goggles', 'واقية': 'goggles',
+    // ── Extended keywords from ChemDB ──
+    ...ChemDB.keywords,
   };
 
   /// Resolves a tool name from the AI into a known [LabItem].
@@ -284,72 +344,8 @@ class LabItemRegistry {
   //  CHEMICAL REACTIONS REGISTRY
   // ─────────────────────────────────────────────────────────────
 
-  static final List<ChemReaction> reactions = [
-    // Sodium + Water → violent fizz
-    ChemReaction(
-      reagentIds: {'sodium', 'water'},
-      resultColor: const Color(0xCCFFD54F),
-      name: 'Sodium + Water',
-      nameAr: 'صوديوم + ماء',
-      equation: '2Na + 2H₂O → 2NaOH + H₂↑',
-      bubbleIntensity: 0.9,
-      heatIntensity: 0.8,
-      description: 'Violent exothermic reaction! Hydrogen gas is released.',
-      descriptionAr: 'تفاعل طارد للحرارة بشدة! يتصاعد غاز الهيدروجين.',
-    ),
-
-    // Acid + Base → neutralization
-    ChemReaction(
-      reagentIds: {'hcl', 'naoh'},
-      resultColor: const Color(0x88B3E5FC),
-      name: 'Acid-Base Neutralization',
-      nameAr: 'تعادل حمض-قاعدة',
-      equation: 'HCl + NaOH → NaCl + H₂O',
-      bubbleIntensity: 0.3,
-      heatIntensity: 0.4,
-      description: 'Neutralization produces salt and water. Temperature rises slightly.',
-      descriptionAr: 'التعادل ينتج ملح وماء. ترتفع الحرارة قليلاً.',
-    ),
-
-    // Vinegar + Baking Soda → fizz
-    ChemReaction(
-      reagentIds: {'vinegar', 'baking_soda'},
-      resultColor: const Color(0xAAE0E0E0),
-      name: 'Vinegar + Baking Soda',
-      nameAr: 'خل + بيكربونات الصوديوم',
-      equation: 'CH₃COOH + NaHCO₃ → CO₂↑ + H₂O + CH₃COONa',
-      bubbleIntensity: 0.8,
-      heatIntensity: 0.1,
-      description: 'CO₂ gas bubbles vigorously! Classic volcano reaction.',
-      descriptionAr: 'غاز ثاني أكسيد الكربون يتصاعد بقوة! تفاعل البركان.',
-    ),
-
-    // Copper Sulfate + Iron → displacement
-    ChemReaction(
-      reagentIds: {'copper', 'iron'},
-      resultColor: const Color(0xBB4CAF50),
-      name: 'Displacement Reaction',
-      nameAr: 'تفاعل إحلال',
-      equation: 'CuSO₄ + Fe → FeSO₄ + Cu↓',
-      bubbleIntensity: 0.1,
-      heatIntensity: 0.2,
-      description: 'Iron displaces copper. Solution turns green, copper deposits on iron.',
-      descriptionAr: 'الحديد يحل محل النحاس. المحلول يتحول للأخضر.',
-    ),
-
-    // HCl + Iron → fizz
-    ChemReaction(
-      reagentIds: {'hcl', 'iron'},
-      resultColor: const Color(0xBBC8E6C9),
-      name: 'Acid + Metal',
-      nameAr: 'حمض + فلز',
-      equation: 'Fe + 2HCl → FeCl₂ + H₂↑',
-      bubbleIntensity: 0.6,
-      heatIntensity: 0.3,
-      description: 'Iron dissolves in acid. Hydrogen gas bubbles out.',
-      descriptionAr: 'الحديد يذوب في الحمض. فقاعات غاز الهيدروجين.',
-    ),
-  ];
+  /// All 100 chemical reactions from the ChemDB.
+  static final List<ChemReaction> reactions = ChemDB.reactions;
 
   /// Finds a reaction matching the given set of reagent IDs.
   /// Returns null if no known reaction matches.

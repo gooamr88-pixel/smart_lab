@@ -194,7 +194,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     FadeTransition(
                       opacity: _fadeAnimation,
                       child: Text(
-                        'Smart Lab',
+                        'Skillify',
                         style: GoogleFonts.inter(
                           fontSize: 44,
                           fontWeight: FontWeight.w800,
@@ -209,7 +209,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     FadeTransition(
                       opacity: _fadeAnimation,
                       child: Text(
-                        'المعمل الذكي التفاعلي',
+                        'طوّر مهاراتك بذكاء',
                         style: GoogleFonts.cairo(
                           fontSize: 22,
                           fontWeight: FontWeight.w600,
@@ -258,11 +258,11 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             // Arabic button
                             SizedBox(
                               width: double.infinity,
-                              height: 56,
                               child: ElevatedButton(
                                 style: ElevatedButton.styleFrom(
                                   backgroundColor: Colors.white,
                                   foregroundColor: AppColors.primaryDark,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(16),
                                   ),
@@ -273,7 +273,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 child: Text(
                                   'ابدأ بالعربية',
                                   style: GoogleFonts.cairo(
-                                    fontSize: 18,
+                                    fontSize: 17,
                                     fontWeight: FontWeight.w700,
                                   ),
                                 ),
@@ -284,10 +284,10 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             // English button
                             SizedBox(
                               width: double.infinity,
-                              height: 56,
                               child: OutlinedButton(
                                 style: OutlinedButton.styleFrom(
                                   foregroundColor: Colors.white,
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
                                   side: BorderSide(
                                     color: Colors.white.withAlpha(60),
                                     width: 1.5,
@@ -301,7 +301,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                                 child: Text(
                                   'Start in English',
                                   style: GoogleFonts.inter(
-                                    fontSize: 18,
+                                    fontSize: 17,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),

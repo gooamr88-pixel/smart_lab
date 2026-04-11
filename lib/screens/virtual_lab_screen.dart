@@ -392,7 +392,6 @@ class _VirtualLabScreenState extends State<VirtualLabScreen>
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
                     child: SizedBox(
                       width: double.infinity,
-                      height: 54,
                       child: AnimatedContainer(
                         duration: AppDurations.normal,
                         child: ElevatedButton(
@@ -406,6 +405,7 @@ class _VirtualLabScreenState extends State<VirtualLabScreen>
                             foregroundColor: labProvider.allToolsPlaced
                                 ? AppColors.primaryDark
                                 : AppColors.textMuted,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),

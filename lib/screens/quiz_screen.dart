@@ -490,12 +490,12 @@ class _QuizScreenState extends State<QuizScreen>
             // Next button
             SizedBox(
               width: double.infinity,
-              height: 52,
               child: ElevatedButton(
                 onPressed: () => quizProvider.nextQuestion(),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryLight,
                   foregroundColor: AppColors.primaryDark,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
@@ -508,6 +508,8 @@ class _QuizScreenState extends State<QuizScreen>
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -623,7 +625,6 @@ class _QuizScreenState extends State<QuizScreen>
               // Action buttons
               SizedBox(
                 width: double.infinity,
-                height: 52,
                 child: ElevatedButton(
                   onPressed: () {
                     quizProvider.resetQuiz();
@@ -636,6 +637,7 @@ class _QuizScreenState extends State<QuizScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: AppColors.primaryDark,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
@@ -646,6 +648,8 @@ class _QuizScreenState extends State<QuizScreen>
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ),

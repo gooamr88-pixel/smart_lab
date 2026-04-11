@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants/app_constants.dart';
 
-/// Material 3 theme for Smart Lab
+/// Material 3 theme for Skillify
 class AppTheme {
   AppTheme._();
 

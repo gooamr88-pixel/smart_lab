@@ -1,12 +1,12 @@
-/// English UI strings for Smart Lab
+/// English UI strings for Skillify
 const Map<String, String> enStrings = {
   // Splash Screen
   'start': 'Start',
-  'splash_subtitle': 'Your Smart Virtual Lab',
+  'splash_subtitle': 'Master Skills with AI',
 
   // Welcome Screen
-  'app_name': 'Smart Lab',
-  'app_subtitle': 'Interactive Virtual Laboratory',
+  'app_name': 'Skillify',
+  'app_subtitle': 'Master Skills with AI',
   'app_description': 'Your virtual lab for Chemistry & Physics',
   'choose_language': 'Choose Language',
   'arabic_version': 'النسخة العربية',

@@ -387,12 +387,12 @@ Respond in JSON ONLY:
           if (_answered)
             SizedBox(
               width: double.infinity,
-              height: 54,
               child: ElevatedButton(
                 onPressed: _nextQuestion,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryLight,
                   foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
@@ -405,6 +405,8 @@ Respond in JSON ONLY:
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ),
@@ -653,7 +655,6 @@ Respond in JSON ONLY:
           // Continue button
           SizedBox(
             width: double.infinity,
-            height: 54,
             child: ElevatedButton(
               onPressed: () {
                 Navigator.pushAndRemoveUntil(
@@ -665,6 +666,7 @@ Respond in JSON ONLY:
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryLight,
                 foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
@@ -675,6 +677,8 @@ Respond in JSON ONLY:
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                 ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
             ),
           ),
